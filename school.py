@@ -7,16 +7,27 @@ class Subject:
     name: str
 
     def __eq__(self, other):
-        return isinstance(other, self.__class__) and self.name.replace(" ", ""), other.name.replace(" ", "")
+        return isinstance(other, self.__class__) and self.name.replace(" ", "") == other.name.replace(" ", "")
+
+    def __hash__(self):
+        return hash(self.name.replace(" ", ""))
 
     def __str__(self):
         return f"{self.name!r}"
+
+    def __post_init__(self):
+        self.__class__.ALL.add(self)
+
+    ALL = set()
 
 
 @dataclasses.dataclass
 class Teacher:
     name: str
     surname: str = dataclasses.field(default=None, kw_only=True)
+
+    def __hash__(self):
+        return hash((self.name, self.surname))
 
     def __post_init__(self):
         space_count = self.name.count(" ")
@@ -26,8 +37,12 @@ class Teacher:
         if self.surname is None:
             self.surname, self.name = self.name.split(" ", 1)
 
+        self.__class__.ALL.add(self)
+
     def __str__(self):
         return f"{self.name} {self.surname}"
+
+    ALL = set()
 
 
 @dataclasses.dataclass

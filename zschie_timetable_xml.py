@@ -11,8 +11,8 @@ from pdfminer.converter import PDFPageAggregator
 
 import geometry
 from geometry import Line, Point, Box
-from zschie_timetable import Lesson
-
+from school import Subject
+from pprint import pprint
 
 def processPage(
         page: PDFPage,
@@ -211,7 +211,7 @@ def readPage(page: PDFPage):
 
     canvas.bind("<Button-1>", lambda event: draw_next_cell())
     canvas.pack()
-    app.mainloop()
+    # app.mainloop()
 
 
 if __name__ == '__main__':
@@ -222,6 +222,8 @@ if __name__ == '__main__':
     device = PDFPageAggregator(rsrcmgr, laparams=laparams)
     interpreter = PDFPageInterpreter(rsrcmgr, device)
     pages = PDFPage.get_pages(fp)
-    next(pages)
-    next(pages)
-    readPage(next(pages))
+
+    for page in pages:
+        readPage(page)
+
+    pprint(Subject.ALL)
