@@ -124,20 +124,19 @@ class LessonCell(Box):
             [
                 (
                     round(abs(list_of_texts[i].box.y2 - list_of_texts[j].box.y1), -1),
-                    round(
-                        list_of_texts[i].box.height, -1
-                    ) == round(
-                        list_of_texts[j].box.height, -1
-                    )
+                    round(list_of_texts[i].box.height, -1) == round(list_of_texts[j].box.height, -1)
                 )
                 for j in range(len(list_of_texts))
             ] for i in range(len(list_of_texts))
         ]
-        pass
 
         all_distances = dict()
         for i, _texts in enumerate(matrix):
             for j, distance_height in enumerate(_texts[:i]):
+                # TODO: this may result in more texts being combined than necessary
+                #  (e.g. if there are 2 or more texts span across multiple lines
+                #  and theirs spaces between them are the same, they will be combined)
+                #  although for the current data set it works fine
                 all_distances.setdefault(distance_height, set())
                 all_distances[distance_height] |= {list_of_texts[i], list_of_texts[j]}
 
@@ -187,35 +186,3 @@ class LessonCell(Box):
             case _:
                 return None
         return lesson
-        """
-        texts: dict[int, [Text]] = dict()
-        for text in sorted(self.texts, key=lambda t: (round(t.box.y2 - t.box.y2, -1), t.box.y2)):
-            index = round(text.box.y1 - text.box.y2, -1)
-            texts.setdefault(index, [])
-            texts[index] += [text]
-
-        text_items = tuple(texts.items())
-        for old_key, value in text_items:
-            key = sorted(value, key=lambda t: t.box.y2)[0].box.top_left
-            texts[key] = value
-            del texts[old_key]
-
-        texts = dict(sorted(texts.items(), key=lambda t: t[0].y))
-        
-        for key, value in texts.items():
-            texts[key] = ' '.join(map(lambda t: t.text, value))
-            texts[key] = re.sub(r"\s+", " ", texts[key]).strip()
-
-        match list(texts.items()):
-            case [(_, teacher), (_, subject), (_, room)]:
-
-                lesson = Lesson(Subject(subject), Teacher(teacher), room)
-            case [(_, teacher), (_, subject), (_, room), (_, groups)]:
-                if teacher[0].islower():
-                    teacher, subject = subject, teacher
-                lesson = Lesson(Subject(subject), Teacher(teacher), room, Group(groups))
-            case _:
-                return None
-        
-        return repr(lesson)
-        """
