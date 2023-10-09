@@ -16,9 +16,19 @@ class Subject:
         return f"{self.name!r}"
 
     def __post_init__(self):
+        words = self.name.split(" ")
+        self.name = ""
+        for word in words:
+            if len(word) < 4 and word not in self.__class__.__SHORT_WORDS:
+                self.name += word
+            else:
+                self.name += " " + word
+        self.name = self.name.strip()
+
         self.__class__.ALL.add(self)
 
     ALL = set()
+    __SHORT_WORDS = ("i", )
 
 
 @dataclasses.dataclass
@@ -30,13 +40,15 @@ class Teacher:
         return hash((self.name, self.surname))
 
     def __post_init__(self):
+        if "/" in self.name:
+            self.__class__.ALL.add(self)
+            return
         space_count = self.name.count(" ")
         if space_count > 1:
             self.name = self.name.replace(" ", "", space_count - 1)
 
         if self.surname is None:
             self.surname, self.name = self.name.split(" ", 1)
-
         self.__class__.ALL.add(self)
 
     def __str__(self):

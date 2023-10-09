@@ -11,7 +11,7 @@ from pdfminer.converter import PDFPageAggregator
 
 import geometry
 from geometry import Line, Point, Box
-from school import Subject
+from school import Subject, Teacher, Group
 from pprint import pprint
 
 def processPage(
@@ -222,8 +222,10 @@ if __name__ == '__main__':
     device = PDFPageAggregator(rsrcmgr, laparams=laparams)
     interpreter = PDFPageInterpreter(rsrcmgr, device)
     pages = PDFPage.get_pages(fp)
-
+    for i in range(22):
+        next(pages)
+    readPage(next(pages))
     for page in pages:
         readPage(page)
 
-    pprint(Subject.ALL)
+    pprint(Teacher.ALL)

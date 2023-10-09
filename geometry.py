@@ -88,8 +88,20 @@ class Box:
     def y2(self):
         return self.bottom_right.y
 
+    @property
+    def width(self):
+        return abs(self.x2 - self.x1)
+
+    @property
+    def height(self):
+        return abs(self.y2 - self.y1)
+
     def __hash__(self):
         return hash((self.top_left, self.bottom_right))
+
+    @staticmethod
+    def overlap(box1, box2):
+        return box1.x1 <= box2.x2 and box1.x2 >= box2.x1 and box1.y1 <= box2.y2 and box1.y2 >= box2.y1
 
 
 @dataclasses.dataclass
@@ -105,8 +117,77 @@ class Text:
 class LessonCell(Box):
     texts: list[Text] = dataclasses.field(default_factory=list, compare=False, init=False)
 
+    @staticmethod
+    def combine_texts(list_of_texts: list[Text]) -> list[Text]:
+        # Matrix of distances between texts
+        matrix = [
+            [
+                (
+                    round(abs(list_of_texts[i].box.y2 - list_of_texts[j].box.y1), -1),
+                    round(
+                        list_of_texts[i].box.height, -1
+                    ) == round(
+                        list_of_texts[j].box.height, -1
+                    )
+                )
+                for j in range(len(list_of_texts))
+            ] for i in range(len(list_of_texts))
+        ]
+        pass
+
+        all_distances = dict()
+        for i, _texts in enumerate(matrix):
+            for j, distance_height in enumerate(_texts[:i]):
+                all_distances.setdefault(distance_height, set())
+                all_distances[distance_height] |= {list_of_texts[i], list_of_texts[j]}
+
+        # remove distances that are too rare
+        for distance_height, count in list(all_distances.items()):
+            if len(count) < 2 or not distance_height[1]:
+                del all_distances[distance_height]
+
+        new_all_distances = dict()
+        for (distance, _), _texts in all_distances.items():
+            texts = list(_texts)
+            for new_distance, new_all_distance_texts in new_all_distances.items():
+                if texts[0] == new_all_distance_texts[0]:
+                    if len(texts) > len(new_all_distance_texts):
+                        new_all_distances[new_distance] = texts
+                    break
+            else:
+                new_all_distances[distance] = texts
+
+        text_lines = []
+        for texts in list(new_all_distances.values()):
+            sorted_texts = sorted(texts, key=lambda t: t.box.y1)
+            text_lines.append(Text(
+                ' '.join(map(lambda t: t.text, sorted_texts)),
+                Box(sorted_texts[0].box.top_left, sorted_texts[-1].box.bottom_right)
+            ))
+        for text in list_of_texts:
+            if any(map(lambda t: text in t, new_all_distances.values())):
+                continue
+            text_lines.append(text)
+
+        return sorted(text_lines, key=lambda t: t.box.y1)
+
     @property
     def combined_text(self):
+        texts = LessonCell.combine_texts(self.texts)
+
+        texts = list(map(lambda t: re.sub(r"\s+", " ", t.text).strip(), texts))
+
+        match texts:
+            case [teacher, subject, room]:
+                lesson = Lesson(Subject(subject), Teacher(teacher), room)
+            case [teacher, subject, room, groups]:
+                if teacher[0].islower():
+                    teacher, subject = subject, teacher
+                lesson = Lesson(Subject(subject), Teacher(teacher), room, Group(groups))
+            case _:
+                return None
+        return lesson
+        """
         texts: dict[int, [Text]] = dict()
         for text in sorted(self.texts, key=lambda t: (round(t.box.y2 - t.box.y2, -1), t.box.y2)):
             index = round(text.box.y1 - text.box.y2, -1)
@@ -120,17 +201,21 @@ class LessonCell(Box):
             del texts[old_key]
 
         texts = dict(sorted(texts.items(), key=lambda t: t[0].y))
-
+        
         for key, value in texts.items():
             texts[key] = ' '.join(map(lambda t: t.text, value))
             texts[key] = re.sub(r"\s+", " ", texts[key]).strip()
 
         match list(texts.items()):
             case [(_, teacher), (_, subject), (_, room)]:
+
                 lesson = Lesson(Subject(subject), Teacher(teacher), room)
             case [(_, teacher), (_, subject), (_, room), (_, groups)]:
+                if teacher[0].islower():
+                    teacher, subject = subject, teacher
                 lesson = Lesson(Subject(subject), Teacher(teacher), room, Group(groups))
             case _:
                 return None
-
+        
         return repr(lesson)
+        """
