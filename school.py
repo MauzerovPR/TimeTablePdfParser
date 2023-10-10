@@ -1,5 +1,6 @@
 import dataclasses
 import typing
+import warnings
 
 
 @dataclasses.dataclass
@@ -41,6 +42,7 @@ class Teacher:
 
     def __post_init__(self):
         if "/" in self.name:
+            warnings.warn("Multiple teachers is not implemented yet.", RuntimeWarning)
             self.__class__.ALL.add(self)
             return
         space_count = self.name.count(" ")
@@ -65,12 +67,23 @@ class Group:
         return f"{self.any!r}"
 
 
+@dataclasses.dataclass(frozen=True)
+class LessonTime:
+    hour: int
+    day: int
+    block_length: int = dataclasses.field(default=1, compare=False)
+
+    def __iter__(self):
+        return dataclasses.astuple(self).__iter__()
+
+
 @dataclasses.dataclass
 class Lesson:
     subject: Subject
     teacher: Teacher
     room: str
     groups: Group = dataclasses.field(default_factory=Group, compare=False)
+    time: LessonTime = dataclasses.field(default=None, compare=False)
 
     def __str__(self):
         return f"{self.teacher=!r}, {self.subject=!r}, {self.room=!r}, {self.groups=!r}"

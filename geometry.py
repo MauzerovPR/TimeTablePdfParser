@@ -1,7 +1,7 @@
 import dataclasses
 import re
 
-from school import Lesson, Subject, Teacher, Group
+from school import Lesson, Subject, Teacher, Group, LessonTime
 
 
 @dataclasses.dataclass
@@ -115,7 +115,12 @@ class Text:
 
 @dataclasses.dataclass
 class LessonCell(Box):
+    @classmethod
+    def from_box(cls, box: Box):
+        return cls(box.top_left, box.bottom_right)
+
     texts: list[Text] = dataclasses.field(default_factory=list, compare=False, init=False)
+    index: LessonTime = dataclasses.field(default=None, compare=False, init=False)
 
     @staticmethod
     def combine_texts(list_of_texts: list[Text]) -> list[Text]:
@@ -170,19 +175,18 @@ class LessonCell(Box):
 
         return sorted(text_lines, key=lambda t: t.box.y1)
 
-    @property
-    def combined_text(self):
+    def get_lesson(self):
         texts = LessonCell.combine_texts(self.texts)
 
         texts = list(map(lambda t: re.sub(r"\s+", " ", t.text).strip(), texts))
 
         match texts:
             case [teacher, subject, room]:
-                lesson = Lesson(Subject(subject), Teacher(teacher), room)
+                lesson = Lesson(Subject(subject), Teacher(teacher), room, time=LessonTime(*self.index))
             case [teacher, subject, room, groups]:
                 if teacher[0].islower():
                     teacher, subject = subject, teacher
-                lesson = Lesson(Subject(subject), Teacher(teacher), room, Group(groups))
+                lesson = Lesson(Subject(subject), Teacher(teacher), room, Group(groups), time=LessonTime(*self.index))
             case _:
                 return None
         return lesson

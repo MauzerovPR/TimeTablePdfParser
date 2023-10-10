@@ -10,6 +10,7 @@ from pdfminer.pdfinterp import PDFPageInterpreter
 from pdfminer.converter import PDFPageAggregator
 
 import geometry
+import school
 from geometry import Line, Point, Box
 from school import Subject, Teacher, Group
 from pprint import pprint
@@ -169,10 +170,19 @@ def readPage(page: PDFPage):
             break
     cells = list(sorted(cells, key=lambda c: (c.top_left.x, c.top_left.y), reverse=True))
 
+    max_height = max(map(lambda c: c.height, cells))
+    min_width = min(map(lambda c: c.width, cells))
+
+    lesson_cells = []
     for cell in cells:
-        cell: geometry.LessonCell
-        cell.__class__ = geometry.LessonCell
-        cell.texts = []
+        lesson = geometry.LessonCell.from_box(cell)
+        lesson.index = school.LessonTime(
+            (cell.top_left.x - top_left_x) // min_width - 1,
+            (cell.top_left.y - top_left_y) // max_height,
+            cell.width // min_width,
+        )
+        lesson_cells.append(lesson)
+    cells = lesson_cells
     for text in texts:
         for cell in cells:
             if cell.top_left.x <= text.box.top_left.x <= cell.bottom_right.x and \
@@ -188,8 +198,12 @@ def readPage(page: PDFPage):
                 anchor="nw",
                 font=("Arial", 7)
             )
-        if cell.combined_text:
-            print(cell.combined_text)
+        if text := cell.get_lesson():
+            print(text)
+
+    lessons = list(filter(lambda x: x is not None, map(lambda x: x.get_lesson(), cells)))
+
+    pprint(lessons)
 
     def draw_cell(cell: Box):
         nonlocal canvas
@@ -211,8 +225,8 @@ def readPage(page: PDFPage):
 
     canvas.bind("<Button-1>", lambda event: draw_next_cell())
     canvas.pack()
-    # app.mainloop()
-
+    app.mainloop()
+    return lessons
 
 if __name__ == '__main__':
     fp = open('Plan-zajec-edukacyjnych-od-dnia-4.09.2023-r..pdf', 'rb')
@@ -224,8 +238,8 @@ if __name__ == '__main__':
     pages = PDFPage.get_pages(fp)
     for i in range(22):
         next(pages)
-    readPage(next(pages))
-    for page in pages:
-        readPage(page)
+    lessons = readPage(next(pages))
+    # for page in pages:
+    #     readPage(page)
 
     pprint(Teacher.ALL)
