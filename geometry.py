@@ -128,7 +128,14 @@ class LessonCell(Box):
         matrix = [
             [
                 (
-                    round(abs(list_of_texts[i].box.y2 - list_of_texts[j].box.y1), -1),
+                    round(
+                        # FIXME: not to proud of this solution but it works
+                        #  the condition is required because sometimes output is negative
+                        #  meaning that i computed it the wrong way (i don't know why)
+                        (list_of_texts[i].box.y1 - list_of_texts[j].box.y2)
+                        if (list_of_texts[i].box.y1 - list_of_texts[j].box.y2) > 0
+                        else (list_of_texts[j].box.y1 - list_of_texts[i].box.y2),
+                        -1),
                     round(list_of_texts[i].box.height, -1) == round(list_of_texts[j].box.height, -1)
                 )
                 for j in range(len(list_of_texts))
@@ -147,7 +154,7 @@ class LessonCell(Box):
 
         # remove distances that are too rare
         for distance_height, count in list(all_distances.items()):
-            if len(count) < 2 or not distance_height[1]:
+            if len(count) < 2 or not distance_height[1] or distance_height[0] >= 10_000:
                 del all_distances[distance_height]
 
         new_all_distances = dict()
@@ -173,7 +180,7 @@ class LessonCell(Box):
                 continue
             text_lines.append(text)
 
-        return sorted(text_lines, key=lambda t: t.box.y1)
+        return sorted(text_lines, key=lambda t: (t.box.y1, t.box.x1))
 
     def get_lesson(self):
         texts = LessonCell.combine_texts(self.texts)
@@ -184,8 +191,13 @@ class LessonCell(Box):
             case [teacher, subject, room]:
                 lesson = Lesson(Subject(subject), Teacher(teacher), room, time=LessonTime(*self.index))
             case [teacher, subject, room, groups]:
+                if len(groups) < len(room):
+                    # condition is required because sometimes groups wraps around to the next line
+                    room, groups = groups, room
                 if teacher[0].islower():
                     teacher, subject = subject, teacher
+                    # raise NotImplementedError("Yek! Something went wrong!")
+                assert "Grupa" in groups
                 lesson = Lesson(Subject(subject), Teacher(teacher), room, Group(groups), time=LessonTime(*self.index))
             case _:
                 return None

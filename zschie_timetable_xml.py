@@ -181,6 +181,7 @@ def readPage(page: PDFPage):
             (cell.top_left.y - top_left_y) // max_height,
             cell.width // min_width,
         )
+        assert lesson.index.block_length > 0
         lesson_cells.append(lesson)
     cells = lesson_cells
     for text in texts:
@@ -225,7 +226,7 @@ def readPage(page: PDFPage):
 
     canvas.bind("<Button-1>", lambda event: draw_next_cell())
     canvas.pack()
-    app.mainloop()
+    # app.mainloop()
     return lessons
 
 if __name__ == '__main__':
@@ -236,10 +237,10 @@ if __name__ == '__main__':
     device = PDFPageAggregator(rsrcmgr, laparams=laparams)
     interpreter = PDFPageInterpreter(rsrcmgr, device)
     pages = PDFPage.get_pages(fp)
-    for i in range(22):
+    for i in range(14):
         next(pages)
     lessons = readPage(next(pages))
-    # for page in pages:
-    #     readPage(page)
+    for page in pages:
+        readPage(page)
 
     pprint(Teacher.ALL)
