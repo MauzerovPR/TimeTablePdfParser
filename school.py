@@ -29,7 +29,7 @@ class Subject:
         self.__class__.ALL.add(self)
 
     ALL = set()
-    __SHORT_WORDS = ("i", )
+    __SHORT_WORDS = ("i", "z")
 
 
 @dataclasses.dataclass
