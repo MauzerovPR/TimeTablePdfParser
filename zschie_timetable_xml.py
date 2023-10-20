@@ -1,4 +1,7 @@
 import dataclasses
+import re
+import sqlite3
+import warnings
 from typing import Iterator
 
 import tkinter as tk
@@ -9,11 +12,16 @@ from pdfminer.pdfinterp import PDFResourceManager
 from pdfminer.pdfinterp import PDFPageInterpreter
 from pdfminer.converter import PDFPageAggregator
 
+import db
 import geometry
 import school
 from geometry import Line, Point, Box
 from school import Subject, Teacher, Group
 from pprint import pprint
+
+import numpy as np
+import pandas as pd
+
 
 def processPage(
         page: PDFPage,
@@ -49,7 +57,7 @@ def readPage(page: PDFPage):
             lines.append(obj)
         elif isinstance(obj, geometry.Text):
             texts.append(obj)
-
+    _, class_name, _, educator, *texts = texts
     app = tk.Tk()
     canvas = tk.Canvas(app, width=1200, height=800)
 
@@ -199,12 +207,12 @@ def readPage(page: PDFPage):
                 anchor="nw",
                 font=("Arial", 7)
             )
-        if text := cell.get_lesson():
-            print(text)
+        # if text := cell.get_lesson():
+        #     print(text)
 
     lessons = list(filter(lambda x: x is not None, map(lambda x: x.get_lesson(), cells)))
 
-    pprint(lessons)
+    # pprint(lessons)
 
     def draw_cell(cell: Box):
         nonlocal canvas
@@ -227,7 +235,18 @@ def readPage(page: PDFPage):
     canvas.bind("<Button-1>", lambda event: draw_next_cell())
     canvas.pack()
     # app.mainloop()
+    educator_surname, educator_name = re.match("Wychowawca : (.+) (.+)", educator.text).groups()
+    educator, = filter(
+        lambda teacher: hash(teacher) == hash((educator_name, educator_surname)),
+        Teacher.ALL
+    )
+    educator.class_name = class_name.text.strip()
+
+    for lesson in lessons:
+        lesson.class_name = educator.class_name
+
     return lessons
+
 
 if __name__ == '__main__':
     fp = open('Plan-zajec-edukacyjnych-od-dnia-4.09.2023-r..pdf', 'rb')
@@ -237,10 +256,124 @@ if __name__ == '__main__':
     device = PDFPageAggregator(rsrcmgr, laparams=laparams)
     interpreter = PDFPageInterpreter(rsrcmgr, device)
     pages = PDFPage.get_pages(fp)
-    for i in range(14):
+    for i in range(0):  # 14
         next(pages)
-    lessons = readPage(next(pages))
+    lessons: list[school.Lesson] = readPage(next(pages))
     for page in pages:
-        readPage(page)
+        lessons += readPage(page)
 
-    pprint(Teacher.ALL)
+    # pprint(Teacher.ALL)
+
+    with db.Database() as cursor:
+        cursor.executemany(
+            """
+            INSERT INTO Teachers (name, surname, class_id)
+            VALUES (?, ?, ?)
+            """,
+            pd.DataFrame(
+                filter(
+                    lambda teacher: teacher.surname is not None,
+                    Teacher.ALL
+                ),
+            )
+            .itertuples(index=False)
+        )
+
+        room_subject_group = pd.DataFrame(map(
+            lambda lesson: (
+                lesson.room,
+                lesson.subject.name,
+                lesson.groups.any is not None,
+            ),
+            lessons
+        ))
+
+        cursor.executemany(
+            """
+            INSERT INTO Subjects (name, is_group)
+            VALUES (?, ?)
+            """,
+            room_subject_group[[1, 2]]
+            .drop_duplicates()
+            .itertuples(index=False)
+        )
+
+        cursor.executemany(
+            """
+            INSERT INTO Rooms (room_id)
+            VALUES (?)
+            """,
+            room_subject_group[[0]]
+            .drop_duplicates()
+            .itertuples(index=False)
+        )
+
+        cursor.executemany(
+            """
+            INSERT INTO Subject_Rooms (subject_id, room_id)
+            VALUES (
+                (SELECT subject_id FROM Subjects WHERE name = ? LIMIT 1),
+                ?)
+            """,
+            room_subject_group[[1, 0]]
+            .drop_duplicates()
+            .itertuples(index=False)
+        )
+        for subject_teacher_group in pd.DataFrame(map(
+                    lambda lesson: (
+                        lesson.subject.name,
+                        lesson.teacher.name,
+                        lesson.teacher.surname,
+                        lesson.class_name
+                    ),
+                    lessons
+                )) \
+                .drop_duplicates() \
+                .itertuples(index=False):
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO Subject_Teachers_Class (subject_id, teacher_id, class_id)
+                    VALUES (
+                        (SELECT subject_id FROM Subjects WHERE name = ? LIMIT 1),
+                        (SELECT teacher_id FROM Teachers WHERE name = ? AND surname = ? LIMIT 1),
+                        ?
+                    ) ON CONFLICT DO NOTHING
+                    """,
+                    subject_teacher_group
+                )
+            except sqlite3.IntegrityError as e:
+                warnings.warn(f"Subject_Teachers_Class {subject_teacher_group} was not added to the database,\ndue to {e}",
+                              RuntimeWarning)
+
+        for lesson in lessons:
+            try:
+                for i in range(lesson.time.block_length):
+                    cursor.execute(
+                        """
+                        INSERT INTO Lesson (subject_id, teacher_id, room_id, class_id, day, hour)
+                        VALUES (
+                            (SELECT subject_id FROM Subjects WHERE name = ? LIMIT 1),
+                            (SELECT teacher_id FROM Teachers WHERE name = ? AND surname = ? LIMIT 1),
+                            ?, ?, ?, ?
+                        )
+                        """,
+                        (
+                            lesson.subject.name,
+                            lesson.teacher.name,
+                            lesson.teacher.surname,
+                            lesson.room,
+                            lesson.class_name,
+                            lesson.time.day,
+                            lesson.time.hour + i
+                        )
+                    )
+            except sqlite3.IntegrityError as e:
+                warnings.warn(f"Lesson {lesson} was not added to the database,\ndue to {e}", RuntimeWarning)
+                continue  # skip block_length > 1 lessons immediately
+
+    # with db.Database() as db:
+    #     db.add_teachers(Teacher.ALL)
+    #     db.add_subjects(Subject.ALL)
+    #     db.add_groups(Group.ALL)
+    #     db.add_lessons(lessons)

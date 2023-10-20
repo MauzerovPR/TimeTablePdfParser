@@ -189,7 +189,12 @@ class LessonCell(Box):
 
         match texts:
             case [teacher, subject, room]:
-                lesson = Lesson(Subject(subject), Teacher(teacher), room, time=LessonTime(*self.index))
+                lesson = Lesson(
+                    Subject(subject),
+                    Teacher(teacher),
+                    room,
+                    time=LessonTime(*self.index)
+                )
             case [teacher, subject, room, groups]:
                 if len(groups) < len(room):
                     # condition is required because sometimes groups wraps around to the next line
@@ -198,7 +203,13 @@ class LessonCell(Box):
                     teacher, subject = subject, teacher
                     # raise NotImplementedError("Yek! Something went wrong!")
                 assert "Grupa" in groups
-                lesson = Lesson(Subject(subject), Teacher(teacher), room, Group(groups), time=LessonTime(*self.index))
+                lesson = Lesson(
+                    Subject(subject),
+                    Teacher(teacher),
+                    room,
+                    Group(groups),
+                    time=LessonTime(*self.index)
+                )
             case _:
                 return None
         return lesson

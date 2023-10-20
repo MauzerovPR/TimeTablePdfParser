@@ -1,6 +1,7 @@
 import dataclasses
 import typing
 import warnings
+from functools import lru_cache
 
 
 @dataclasses.dataclass
@@ -32,10 +33,11 @@ class Subject:
     __SHORT_WORDS = ("i", "z")
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass()
 class Teacher:
     name: str
     surname: str = dataclasses.field(default=None, kw_only=True)
+    class_name: str = dataclasses.field(init=False, default=None, hash=False, compare=False)
 
     def __hash__(self):
         return hash((self.name, self.surname))
@@ -54,11 +56,12 @@ class Teacher:
         self.__class__.ALL.add(self)
 
     def __str__(self):
-        return f"{self.name} {self.surname}"
+        return f"{self.name} {self.surname}" + (f" ({self.class_name})" if self.class_name else "")
 
     ALL = set()
 
 
+# @caching.cache_class
 @dataclasses.dataclass
 class Group:
     any: typing.Any = dataclasses.field(default=None, compare=False)
@@ -67,7 +70,8 @@ class Group:
         return f"{self.any!r}"
 
 
-@dataclasses.dataclass(frozen=True)
+# @caching.cache_class
+@dataclasses.dataclass(frozen=True, unsafe_hash=True)
 class LessonTime:
     hour: int
     day: int
@@ -77,6 +81,7 @@ class LessonTime:
         return dataclasses.astuple(self).__iter__()
 
 
+# @caching.cache_class
 @dataclasses.dataclass
 class Lesson:
     subject: Subject
@@ -84,6 +89,7 @@ class Lesson:
     room: str
     groups: Group = dataclasses.field(default_factory=Group, compare=False)
     time: LessonTime = dataclasses.field(default=None, compare=False)
+    class_name: str = dataclasses.field(init=False, default=None, compare=False)
 
     def __str__(self):
         return f"{self.teacher=!r}, {self.subject=!r}, {self.room=!r}, {self.groups=!r}"
