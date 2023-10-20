@@ -76,12 +76,13 @@ class Database:
         )
         self.cursor.execute(
             """
-            CREATE TABLE IF NOT EXISTS Lesson (
+            CREATE TABLE IF NOT EXISTS Lessons (
                 lesson_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 subject_id INTEGER NOT NULL,
                 teacher_id INTEGER NOT NULL,
                 room_id INTEGER NOT NULL,
                 class_id VARCHAR(20) NOT NULL,
+                [group] VARCHAR(20),
                 day INTEGER NOT NULL,
                 hour INTEGER NOT NULL,
                 FOREIGN KEY (subject_id) REFERENCES Subjects(subject_id),

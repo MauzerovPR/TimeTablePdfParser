@@ -184,6 +184,10 @@ def readPage(page: PDFPage):
     lesson_cells = []
     for cell in cells:
         lesson = geometry.LessonCell.from_box(cell)
+        # somehow day can be 6
+        # lesson in the top of the timetable cell are being assigned floored number,
+        # but the bottom ones are being assigned roofed number
+        # FIXME: fix above issue
         lesson.index = school.LessonTime(
             (cell.top_left.x - top_left_x) // min_width - 1,
             (cell.top_left.y - top_left_y) // max_height,
@@ -351,11 +355,11 @@ if __name__ == '__main__':
                 for i in range(lesson.time.block_length):
                     cursor.execute(
                         """
-                        INSERT INTO Lesson (subject_id, teacher_id, room_id, class_id, day, hour)
+                        INSERT INTO Lessons (subject_id, teacher_id, room_id, class_id, [group], day, hour)
                         VALUES (
                             (SELECT subject_id FROM Subjects WHERE name = ? LIMIT 1),
                             (SELECT teacher_id FROM Teachers WHERE name = ? AND surname = ? LIMIT 1),
-                            ?, ?, ?, ?
+                            ?, ?, ?, ?, ?
                         )
                         """,
                         (
@@ -364,6 +368,7 @@ if __name__ == '__main__':
                             lesson.teacher.surname,
                             lesson.room,
                             lesson.class_name,
+                            lesson.groups.any,
                             lesson.time.day,
                             lesson.time.hour + i
                         )
